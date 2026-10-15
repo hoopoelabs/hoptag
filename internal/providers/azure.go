@@ -44,3 +44,7 @@ func (p *AzureProvider) CanTag(resourceType string) bool {
 func (p *AzureProvider) TagAttributeName(resourceType string) string {
 	return "tags"
 }
+
+func (p *AzureProvider) MaxTags(resourceType string) int {
+	return 50 // Standard Azure resource limit
+}

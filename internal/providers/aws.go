@@ -51,3 +51,12 @@ func (p *AWSProvider) CanTag(resourceType string) bool {
 func (p *AWSProvider) TagAttributeName(resourceType string) string {
 	return "tags"
 }
+
+func (p *AWSProvider) MaxTags(resourceType string) int {
+	switch resourceType {
+	case "aws_s3_object", "aws_s3_bucket_object":
+		return 10 // AWS S3 Object Tagging hard ceiling
+	default:
+		return 50 // Standard AWS tag limit
+	}
+}

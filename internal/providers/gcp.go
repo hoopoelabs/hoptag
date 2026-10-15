@@ -45,3 +45,7 @@ func (p *GCPProvider) CanTag(resourceType string) bool {
 func (p *GCPProvider) TagAttributeName(resourceType string) string {
 	return "labels"
 }
+
+func (p *GCPProvider) MaxTags(resourceType string) int {
+	return 64 // Standard GCP label limit
+}
