@@ -12,14 +12,14 @@ type GCPProvider struct {
 // NewGCPProvider creates an instance of GCPProvider.
 func NewGCPProvider() *GCPProvider {
 	untaggable := map[string]struct{}{
-		"google_project_service":                  {},
-		"google_project_iam_member":               {},
-		"google_project_iam_binding":              {},
-		"google_project_iam_policy":               {},
-		"google_service_account_iam_member":       {},
-		"google_service_account_iam_binding":      {},
-		"google_compute_subnetwork_iam_member":    {},
-		"google_compute_firewall":                 {},
+		"google_project_service":               {},
+		"google_project_iam_member":            {},
+		"google_project_iam_binding":           {},
+		"google_project_iam_policy":            {},
+		"google_service_account_iam_member":    {},
+		"google_service_account_iam_binding":   {},
+		"google_compute_subnetwork_iam_member": {},
+		"google_compute_firewall":              {},
 	}
 	return &GCPProvider{
 		untaggableTypes: untaggable,

@@ -187,4 +187,3 @@ func TestModuleDiscoveryAndTagging(t *testing.T) {
 	assert.Contains(t, string(content), `Environment = "production"`)
 	assert.Contains(t, string(content), `ManagedBy   = "hoptag"`)
 }
-

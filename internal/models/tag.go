@@ -63,9 +63,9 @@ type Violation struct {
 type ViolationType string
 
 const (
-	ViolationMissingTag    ViolationType = "MISSING_TAG"
-	ViolationInvalidValue  ViolationType = "INVALID_VALUE"
-	ViolationDynamicTag    ViolationType = "DYNAMIC_TAG_UNEVALUATED"
+	ViolationMissingTag   ViolationType = "MISSING_TAG"
+	ViolationInvalidValue ViolationType = "INVALID_VALUE"
+	ViolationDynamicTag   ViolationType = "DYNAMIC_TAG_UNEVALUATED"
 )
 
 // ResourceTagStats tracks tag injection details for a single resource.

@@ -12,12 +12,12 @@ type AzureProvider struct {
 // NewAzureProvider creates an instance of AzureProvider.
 func NewAzureProvider() *AzureProvider {
 	untaggable := map[string]struct{}{
-		"azurerm_resource_group_policy_assignment":           {},
-		"azurerm_subnet_network_security_group_association":  {},
-		"azurerm_subnet_route_table_association":             {},
-		"azurerm_role_assignment":                            {},
-		"azurerm_role_definition":                            {},
-		"azurerm_network_interface_security_group_association": {},
+		"azurerm_resource_group_policy_assignment":                                       {},
+		"azurerm_subnet_network_security_group_association":                              {},
+		"azurerm_subnet_route_table_association":                                         {},
+		"azurerm_role_assignment":                                                        {},
+		"azurerm_role_definition":                                                        {},
+		"azurerm_network_interface_security_group_association":                           {},
 		"azurerm_network_interface_application_gateway_backend_address_pool_association": {},
 	}
 	return &AzureProvider{
