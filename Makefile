@@ -12,6 +12,16 @@ build:
 	@echo "==> Building $(BINARY_NAME)..."
 	go build $(LDFLAGS) -o bin/$(BINARY_NAME) .
 
+build-all:
+	@echo "==> Cross-compiling for Linux, macOS, and Windows..."
+	@mkdir -p bin/releases
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o bin/releases/$(BINARY_NAME)-linux-amd64 .
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build $(LDFLAGS) -o bin/releases/$(BINARY_NAME)-linux-arm64 .
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o bin/releases/$(BINARY_NAME)-darwin-amd64 .
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(LDFLAGS) -o bin/releases/$(BINARY_NAME)-darwin-arm64 .
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o bin/releases/$(BINARY_NAME)-windows-amd64.exe .
+	@echo "==> Binaries generated in bin/releases/"
+
 install:
 	@echo "==> Installing $(BINARY_NAME) to \$$GOPATH/bin..."
 	go install $(LDFLAGS) .
