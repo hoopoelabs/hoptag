@@ -93,8 +93,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if tagInput == "" && len(tags) == 0 {
 		tagInput = strings.TrimSpace(os.Getenv("HOPTAG_TAGS"))
 	}
-	if tagInput == "" && len(tags) == 0 {
-	}
 
 	if tagInput != "" {
 		cliTags, err := models.ParseTags(tagInput)
@@ -112,8 +110,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 	// 2. Validate mode
 	normalizedMode := strings.ToLower(strings.TrimSpace(applyMode))
-		normalizedMode = models.ModeRename
-	}
 	if normalizedMode != models.ModeInPlace && normalizedMode != models.ModeOverride && normalizedMode != models.ModeRename {
 		return fmt.Errorf("invalid mode %q: must be 'in-place', 'override', or 'rename'", applyMode)
 	}

@@ -13,9 +13,9 @@ import (
 )
 
 var ignoredDirNames = map[string]struct{}{
-	".terraform": {},
-	".git":       {},
-	".hoptag":    {},
+	".terraform":   {},
+	".git":         {},
+	".hoptag":      {},
 	"node_modules": {},
 }
 
@@ -81,7 +81,7 @@ func isCandidateFile(name string) bool {
 	if !strings.HasSuffix(name, ".tf") {
 		return false
 	}
-	// Avoid hoptag artifacts and override files
+	// Avoid hoptag artifacts, backup, and override files
 	if strings.HasSuffix(name, "_override.tf") ||
 		strings.HasSuffix(name, ".hoptag.tf") ||
 		strings.HasSuffix(name, ".bak") ||
