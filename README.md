@@ -18,6 +18,7 @@ Unlike string-replacement or regex-based tools, `hoptag` operates directly on th
 - **Tag Policy Validation (`hoptag check`)**: Validates tag presence and validates values against regex patterns before plan or apply steps run.
 - **Granular Targeting**: Includes `--filter` and `--skip` flags to match or exclude specific resource types via regular expressions.
 - **Format-Agnostic File Inputs**: Accepts tag definitions directly from files (YAML, JSON, or key=value formats) without requiring specific extensions or syntax wrappers.
+- **Module Support**: Automatically tags resources inside local and remote Terraform modules by reading `.terraform/modules/modules.json` without requiring module authors to expose tag variables.
 - **Pluggable Architecture**: Easily extended to support additional cloud providers, custom resources, or specialized tagging schemas.
 
 ---
@@ -67,6 +68,7 @@ hoptag apply [flags] [file-or-tags]
 | `--filter` | | Regex pattern matching resource types to tag | `""` |
 | `--skip` | | Regex pattern matching resource types to exclude | `""` |
 | `--recursive` | `-r` | Recursively scan subdirectories for `.tf` files | `true` |
+| `--scan-modules` | | Scan and tag external modules in `.terraform/modules` | `true` |
 | `--dry-run` | | Preview changes without modifying files | `false` |
 
 ---
@@ -153,6 +155,31 @@ resource "aws_instance" "web" {
 ```
 
 Terraform natively merges `*_override.tf` files with your existing resources during `terraform plan` and `terraform apply`.
+
+---
+
+## Terraform Module Support (Local and Remote Modules)
+
+`hoptag` automatically handles tagging across module hierarchies:
+
+### 1. Local Modules (`source = "./modules/..."`)
+Local subdirectories are traversed recursively by default (`-r`), and all underlying cloud resources are tagged directly in place.
+
+### 2. Remote and Registry Modules (`terraform-aws-modules/...`, Git, etc.)
+When using external modules, authors do not always expose input variables for tags. `hoptag` solves this by integrating with Terraform's initialization manifest:
+
+```bash
+# 1. Initialize Terraform to download remote modules into .terraform/modules
+terraform init
+
+# 2. Run hoptag (automatically inspects .terraform/modules/modules.json)
+hoptag apply -d . -f tags.json
+
+# 3. Plan or apply with all module resources fully tagged
+terraform plan
+```
+
+`hoptag` automatically inspects `.terraform/modules/modules.json`, locates the downloaded source files for each child module, and applies tags directly to the underlying resource definitions. To disable external module scanning, pass `--scan-modules=false`.
 
 ---
 

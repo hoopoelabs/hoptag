@@ -20,6 +20,7 @@ var (
 	checkSkip          string
 	checkRecursive     bool
 	checkStrictDynamic bool
+	checkScanModules   bool
 )
 
 var checkCmd = &cobra.Command{
@@ -40,6 +41,7 @@ func init() {
 	checkCmd.Flags().StringVar(&checkSkip, "skip", "", "Regex to exclude resource types from checking")
 	checkCmd.Flags().BoolVarP(&checkRecursive, "recursive", "r", true, "Recursively scan subdirectories for .tf files")
 	checkCmd.Flags().BoolVar(&checkStrictDynamic, "strict-dynamic", false, "Fail if tag values use dynamic variables that cannot be evaluated statically")
+	checkCmd.Flags().BoolVar(&checkScanModules, "scan-modules", true, "Scan and validate external/downloaded modules in .terraform/modules")
 
 	_ = checkCmd.MarkFlagRequired("required")
 	rootCmd.AddCommand(checkCmd)
@@ -99,6 +101,30 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	var moduleNames []string
+	if checkScanModules {
+		modFiles, names, err := hcl.DiscoverModuleFiles(checkDir)
+		if err == nil && len(modFiles) > 0 {
+			moduleNames = names
+			seen := make(map[string]struct{})
+			for _, p := range filePaths {
+				seen[filepath.Clean(p)] = struct{}{}
+			}
+			for _, p := range modFiles {
+				cleanP := filepath.Clean(p)
+				if _, ok := seen[cleanP]; !ok {
+					seen[cleanP] = struct{}{}
+					filePaths = append(filePaths, cleanP)
+				}
+			}
+			if !quiet && len(moduleNames) > 0 {
+				fmt.Printf("%s %s (%d module(s) included)\n",
+					bold("Terraform Modules:"), cyan(strings.Join(moduleNames, ", ")), len(moduleNames))
+			}
+		}
+	}
+
 	if len(filePaths) == 0 {
 		if !quiet {
 			fmt.Printf("No Terraform (.tf) files found in %q\n", checkDir)

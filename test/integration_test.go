@@ -125,3 +125,66 @@ func TestEndToEndApplyAndCheck(t *testing.T) {
 	assert.Contains(t, string(existingContent), "# Keep this custom tag!")
 	assert.Contains(t, string(existingContent), `BackupPlan  = "Daily"`)
 }
+
+func TestModuleDiscoveryAndTagging(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// 1. Create a root .tf file
+	rootTF := `resource "aws_s3_bucket" "root_bkt" {}`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.tf"), []byte(rootTF), 0644))
+
+	// 2. Setup mock .terraform/modules structure with a downloaded module
+	modDir := filepath.Join(tmpDir, ".terraform", "modules", "vpc")
+	require.NoError(t, os.MkdirAll(modDir, 0755))
+	modTF := `resource "aws_vpc" "mod_vpc" {}`
+	require.NoError(t, os.WriteFile(filepath.Join(modDir, "main.tf"), []byte(modTF), 0644))
+
+	manifestJSON := `{
+		"Modules": [
+			{ "Key": "", "Source": "", "Dir": "." },
+			{
+				"Key": "vpc",
+				"Source": "terraform-aws-modules/vpc/aws",
+				"Version": "5.0.0",
+				"Dir": ".terraform/modules/vpc"
+			}
+		]
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".terraform", "modules", "modules.json"), []byte(manifestJSON), 0644))
+
+	// 3. Discover module files
+	modFiles, names, err := hcl.DiscoverModuleFiles(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"vpc"}, names)
+	require.Len(t, modFiles, 1)
+
+	// 4. Inject tags into the module file
+	reg := providers.DefaultRegistry()
+	tags, err := models.ParseTags("Environment=production,ManagedBy=hoptag")
+	require.NoError(t, err)
+
+	applyOpts := models.ApplyOptions{
+		Dir:  tmpDir,
+		Tags: tags,
+		Mode: models.ModeInPlace,
+	}
+
+	ast, _, err := hcl.LoadFile(modFiles[0])
+	require.NoError(t, err)
+
+	res, err := hcl.InjectTags(ast, modFiles[0], applyOpts, reg)
+	require.NoError(t, err)
+	assert.True(t, res.Modified)
+	assert.Equal(t, 1, res.ResourcesTagged)
+
+	writer := hcl.NewWriter(models.ModeInPlace)
+	require.NoError(t, writer.WriteFile(modFiles[0], ast))
+
+	// 5. Verify the module file on disk was tagged
+	content, err := os.ReadFile(modFiles[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(content), `tags = {`)
+	assert.Contains(t, string(content), `Environment = "production"`)
+	assert.Contains(t, string(content), `ManagedBy   = "hoptag"`)
+}
+

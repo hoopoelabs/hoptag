@@ -24,6 +24,7 @@ var (
 	applyPreserveExisting bool
 	applyRecursive        bool
 	applyDryRun           bool
+	applyScanModules      bool
 )
 
 var applyCmd = &cobra.Command{
@@ -56,6 +57,7 @@ func init() {
 	applyCmd.Flags().BoolVar(&applyPreserveExisting, "preserve-existing", false, "Preserve existing tag values over injected tags on conflict")
 	applyCmd.Flags().BoolVarP(&applyRecursive, "recursive", "r", true, "Recursively scan subdirectories for .tf files")
 	applyCmd.Flags().BoolVar(&applyDryRun, "dry-run", false, "Preview tagging changes without writing to disk")
+	applyCmd.Flags().BoolVar(&applyScanModules, "scan-modules", true, "Scan and tag external/downloaded modules in .terraform/modules")
 
 	rootCmd.AddCommand(applyCmd)
 }
@@ -145,9 +147,38 @@ func runApply(cmd *cobra.Command, args []string) error {
 		Recursive:        applyRecursive,
 	}
 
+	// 4. Discover files
+	filePaths, err := hcl.DiscoverFiles(applyDir, applyRecursive)
+	if err != nil {
+		return err
+	}
+
+	var moduleNames []string
+	if applyScanModules {
+		modFiles, names, err := hcl.DiscoverModuleFiles(applyDir)
+		if err == nil && len(modFiles) > 0 {
+			moduleNames = names
+			seen := make(map[string]struct{})
+			for _, p := range filePaths {
+				seen[filepath.Clean(p)] = struct{}{}
+			}
+			for _, p := range modFiles {
+				cleanP := filepath.Clean(p)
+				if _, ok := seen[cleanP]; !ok {
+					seen[cleanP] = struct{}{}
+					filePaths = append(filePaths, cleanP)
+				}
+			}
+		}
+	}
+
 	if !quiet {
 		fmt.Printf("%s %s (mode: %s, preserve-existing: %t)\n",
 			bold("Target Directory:"), cyan(applyDir), yellow(normalizedMode), applyPreserveExisting)
+		if len(moduleNames) > 0 {
+			fmt.Printf("%s %s (%d module(s) detected)\n",
+				bold("Terraform Modules:"), cyan(strings.Join(moduleNames, ", ")), len(moduleNames))
+		}
 		fmt.Println(bold("Tags to Inject:"))
 		for k, v := range tags {
 			fmt.Printf("   - %s: %s\n", bold(k), v)
@@ -158,11 +189,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
-	// 4. Discover files
-	filePaths, err := hcl.DiscoverFiles(applyDir, applyRecursive)
-	if err != nil {
-		return err
-	}
 	if len(filePaths) == 0 {
 		if !quiet {
 			fmt.Printf("No Terraform (.tf) files found in %q\n", applyDir)
