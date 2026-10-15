@@ -1,8 +1,7 @@
 # hoptag
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/hoopoelabs/hoptag)](https://goreportcard.com/report/github.com/hoopoelabs/hoptag)
 [![License: Hoopoe Labs Free-Use](https://img.shields.io/badge/License-Hoopoe%20Labs%20Free--Use-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/hoopoelabs/hoptag)](go.mod)
+[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8.svg)](go.mod)
 
 `hoptag` is a CLI tool developed by Hoopoe Labs for scanning Terraform and OpenTofu infrastructure-as-code files and automatically injecting, merging, and validating resource tags and labels across AWS, Microsoft Azure, and Google Cloud Platform (GCP).
 
