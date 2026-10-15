@@ -71,24 +71,24 @@ hoptag apply [flags] [file-or-tags]
 
 ---
 
-## Tag File Input Capabilities
+## Tag File Input (.json, .yaml, .env, etc.)
 
-`hoptag` provides flexible, extension-agnostic file loading. You are never forced to use specific file extensions (such as `.json` or `.yaml`) or complex syntax wrappers.
+Instead of typing tag values directly into the CLI, you can store your tags in a `.json` file (or `.yaml`, `.env`, or any text file) and pass it directly to `hoptag`.
 
 ### Three Ways to Supply Tag Files
 
-1. **Direct Positional Argument** (no flags needed):
+1. **Direct Argument** (pass the JSON or YAML file path directly):
    ```bash
-   hoptag apply -d ./infra my-tags-file
+   hoptag apply -d ./infra tags.json
    ```
 2. **Via the `-f / --tags-file` Flag**:
    ```bash
-   hoptag apply -d ./infra -f ./configs/production-tags
+   hoptag apply -d ./infra -f ./configs/tags.json
    ```
 3. **Via the `-t / --tags` Flag**:
    ```bash
-   # Automatically detects if the argument is a file on disk
-   hoptag apply -d ./infra -t ./configs/production-tags
+   # Automatically detects if the path is an existing file on disk
+   hoptag apply -d ./infra -t ./configs/tags.json
    ```
 
 ### Supported Content Formats
@@ -230,124 +230,6 @@ Summary: 2 violation(s) found across 8 resources in 3 files.
      Environment = "prod"
    })
    ```
-
----
-
-## Extensibility and Custom Providers
-
-`hoptag` is architected with a decoupled provider registry that allows developers to add support for new clouds or specialized resource rules.
-
-### The `Provider` Interface
-
-Every cloud provider in `hoptag` implements the `Provider` interface defined in `internal/providers/provider.go`:
-
-```go
-type Provider interface {
-    // Name returns the friendly display name of the provider (e.g. "AWS", "Alibaba").
-    Name() string
-
-    // Prefix returns the Terraform resource type prefix (e.g. "aws_", "alicloud_").
-    Prefix() string
-
-    // CanTag reports whether the specified resource type supports tags or labels.
-    CanTag(resourceType string) bool
-
-    // TagAttributeName returns the attribute key used for tags (e.g. "tags" or "labels").
-    TagAttributeName(resourceType string) string
-}
-```
-
-### Implementing a Custom Provider
-
-To add support for a new cloud provider (e.g., Alibaba Cloud or Kubernetes), create an implementation of the interface:
-
-```go
-package custom
-
-import (
-    "strings"
-    "github.com/hoopoelabs/hoptag/internal/providers"
-)
-
-type AlibabaProvider struct {
-    untaggable map[string]struct{}
-}
-
-func NewAlibabaProvider() *AlibabaProvider {
-    return &AlibabaProvider{
-        untaggable: map[string]struct{}{
-            "alicloud_route_entry": {},
-        },
-    }
-}
-
-func (p *AlibabaProvider) Name() string                     { return "Alibaba" }
-func (p *AlibabaProvider) Prefix() string                   { return "alicloud_" }
-func (p *AlibabaProvider) TagAttributeName(r string) string { return "tags" }
-func (p *AlibabaProvider) CanTag(resourceType string) bool {
-    if !strings.HasPrefix(resourceType, p.Prefix()) {
-        return false
-    }
-    _, blocked := p.untaggable[resourceType]
-    return !blocked
-}
-```
-
-### Registering the Provider
-
-Register your provider with the registry:
-
-```go
-registry := providers.DefaultRegistry()
-registry.Register(NewAlibabaProvider())
-```
-
-Once registered, `hoptag apply` and `hoptag check` will automatically recognize `alicloud_*` resources and tag or validate them according to your defined rules.
-
----
-
-## Project Structure
-
-```
-hoptag/
-├── cmd/
-│   ├── root.go             # Root command definition, global flags, and banner styling
-│   ├── apply.go            # 'hoptag apply' implementation (file resolution and tagging)
-│   ├── check.go            # 'hoptag check' implementation (governance and regex policy engine)
-│   └── version.go          # Version info and build metadata
-├── internal/
-│   ├── hcl/
-│   │   ├── parser.go       # HCL file discovery, path normalization, and AST loading
-│   │   ├── injector.go     # Surgical AST token manipulation and comment-preserving merger
-│   │   ├── writer.go       # Writers for in-place updates, override files, and backups
-│   │   ├── injector_test.go# Unit tests for tag injection, comment preservation, and filters
-│   │   └── writer_test.go  # Unit tests for safe in-place, rename, and override file creation
-│   ├── providers/
-│   │   ├── provider.go     # Provider interface and concurrent Registry implementation
-│   │   ├── aws.go          # AWS tagging rules (tags attribute and untaggable exclusion list)
-│   │   ├── azure.go        # Azure tagging rules (tags attribute and untaggable exclusion list)
-│   │   ├── gcp.go          # GCP labeling rules (labels attribute and untaggable exclusion list)
-│   │   └── providers_test.go# Unit tests verifying provider detection and capability checks
-│   ├── validator/
-│   │   ├── validator.go    # Tag policy evaluator (presence checks and regex pattern matching)
-│   │   └── validator_test.go# Unit tests for policy verification and violation detection
-│   └── models/
-│       ├── tag.go          # Data structures (TagMap, TagRule, ApplyOptions, CheckOptions)
-│       └── tag_test.go     # Tests for JSON, YAML, and line-delimited file parsing
-├── test/
-│   ├── fixtures/           # Sample Terraform files (AWS, Azure, GCP, comments, dynamic tags)
-│   └── integration_test.go # End-to-end integration tests (apply -> check -> verify)
-├── .github/
-│   └── workflows/
-│       ├── ci.yml          # Continuous integration workflow (Ubuntu, macOS, Windows)
-│       └── release.yml     # Automated multi-platform release workflow
-├── .goreleaser.yaml        # GoReleaser configuration for cross-platform binary releases
-├── Makefile                # Build, test, cross-compile (build-all), clean, and format targets
-├── LICENSE                 # Hoopoe Labs Source-Available License (Attribution & Anti-Rebranding)
-├── NOTICE                  # Permanent author credit and trademark notice
-├── go.mod                  # Go module definition
-└── README.md               # Project documentation
-```
 
 ---
 
