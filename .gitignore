@@ -1,0 +1,16 @@
+# Binaries
+bin/
+hoptag
+
+# Output artifacts
+*.bak
+*.hoptag.tf
+_hoptag_override.tf
+coverage.out
+
+# OS files
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
