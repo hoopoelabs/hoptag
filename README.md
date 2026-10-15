@@ -1,134 +1,152 @@
-# 🏷️ hoptag
+# hoptag
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/hoopoelabs/hoptag)](https://goreportcard.com/report/github.com/hoopoelabs/hoptag)
 [![License: Hoopoe Labs Free-Use](https://img.shields.io/badge/License-Hoopoe%20Labs%20Free--Use-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/hoopoelabs/hoptag)](go.mod)
 
-> **Modern, AST-Safe Infrastructure as Code (IaC) Auto-Tagger & Governance CLI**  
-> Developed by **Hoopoe Labs**
+`hoptag` is a CLI tool developed by Hoopoe Labs for scanning Terraform and OpenTofu infrastructure-as-code files and automatically injecting, merging, and validating resource tags and labels across AWS, Microsoft Azure, and Google Cloud Platform (GCP).
 
-`hoptag` automatically scans Terraform and OpenTofu infrastructure-as-code files and injects, merges, and validates resource tags and labels across **AWS**, **Microsoft Azure**, and **Google Cloud Platform (GCP)**.
-
-Unlike legacy taggers that rely on crude string manipulation or destructive overwrites, `hoptag` uses HashiCorp's official `hclwrite` parser to surgically modify HCL syntax trees while keeping comments, line breaks, and formatting pristine.
+Unlike string-replacement or regex-based tools, `hoptag` operates on the HCL syntax tree via HashiCorp's `hclwrite` library, ensuring that comments, line breaks, indentation, and existing expressions remain intact.
 
 ---
 
-## 🚀 Key Features
+## Features
 
-- **🛡️ AST-Safe & Non-Destructive**: Preserves developer comments, blank lines, and formatting using native HCL AST parsing.
-- **☁️ Multi-Cloud Native**: Seamlessly maps standard tag sets to AWS `tags`, Azure `tags`, and GCP `labels`.
-- **⚡ Non-Destructive CI Mode (`--mode override`)**: Generates Terraform-native `_hoptag_override.tf` files instead of dirtying your git working tree.
-- **🔄 Smart Attribute Merging**: Preserves custom existing tags and intelligently wraps dynamic expressions (e.g. `var.common_tags`) with `merge()`.
-- **📋 Governance & Policy Enforcement (`hoptag check`)**: Validates existing tags against mandatory keys and regex schema rules before `terraform plan` or `terraform apply`.
-- **🎯 Precise Granularity**: Filter or skip resources using regex (`--filter`, `--skip`).
+- **AST-Safe Modification**: Uses HashiCorp's official `hclwrite` parser to modify configuration blocks without destroying comments, blank lines, or existing formatting.
+- **Multi-Cloud Mapping**: Maps tags to the appropriate provider attributes: AWS (`tags`), Azure (`tags`), and GCP (`labels`).
+- **Non-Destructive Override Mode (`--mode override`)**: Generates Terraform-native `_hoptag_override.tf` files instead of mutating source files, preventing dirty git states during CI/CD execution.
+- **Expression Merging**: Merges new keys into existing map literals and wraps dynamic expressions (such as `tags = var.common_tags`) using Terraform's native `merge()` function.
+- **Tag Policy Validation (`hoptag check`)**: Validates tag presence and validates values against regex patterns before plan or apply steps run.
+- **Granular Targeting**: Includes `--filter` and `--skip` flags to match or exclude specific resource types via regular expressions.
+- **Format-Agnostic File Inputs**: Accepts tag definitions directly from files (YAML, JSON, or key=value formats) without requiring specific extensions or syntax wrappers.
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### From Source (Go 1.22+)
+
 ```bash
 go install github.com/hoopoelabs/hoptag@latest
 ```
 
-### Build Locally
+### Build from Repository
+
 ```bash
 git clone https://github.com/hoopoelabs/hoptag.git
 cd hoptag
 make build
-# Binary is in ./bin/hoptag
+# Binary is placed in ./bin/hoptag
 ```
+
+### Pre-built Binaries
+
+Pre-compiled binaries for Linux (amd64, arm64), macOS (Intel, Apple Silicon), and Windows are available on the [Releases](https://github.com/hoopoelabs/hoptag/releases) page.
 
 ---
 
-## 🛠️ Usage & Commands
+## Usage
 
-### 1. `hoptag apply` — Inject & Merge Tags
+### 1. `hoptag apply`
 
-Automatically injects tags into all compatible resources in the target directory.
+Injects and merges tags across all supported resources in the target directory.
 
-#### Reading Tags Directly From a File (Any Filename or Extension!)
-Pass the file path directly as an argument or via `-f / --tags-file`. `hoptag` automatically detects YAML, JSON, or key=value formats:
+#### Passing a File Directly
+
+You can pass a tag configuration file directly as an argument, or use `-f / --tags-file`. Content format (YAML, JSON, or line-delimited key=value) is detected automatically:
+
 ```bash
-# Direct argument (no flags needed!)
-hoptag apply -d ./infra my-tags-file
+# Direct positional argument
+hoptag apply -d ./infra tags.yaml
 
-# Via -f or --tags-file flag
-hoptag apply -d ./infra -f ./config/tags.yaml
+# Using the -f flag
+hoptag apply -d ./infra -f ./config/tags.json
 
-# Via -t flag
-hoptag apply -d ./infra -t ./tags.env
-```
-*Supported file contents: YAML (`key: value`), JSON (`{"key":"value"}`), or line-by-line (`key=value` or `key: value`).*
-
-#### Inline JSON Input Format
-```bash
-hoptag apply -d ./infra -t '{"Environment":"production","CostCenter":"FIN-104","ManagedBy":"hoptag"}'
+# Using key=value properties file
+hoptag apply -d ./infra -f ./tags.env
 ```
 
-#### Inline Key-Value Shorthand Format
+#### Inline Tags
+
+Tags can also be provided inline as JSON or key-value pairs:
+
 ```bash
-hoptag apply -d ./infra -t "Environment=production,CostCenter=FIN-104,Team=DevOps"
+# JSON format
+hoptag apply -d ./infra -t '{"Environment":"production","CostCenter":"FIN-104"}'
+
+# Key-value shorthand
+hoptag apply -d ./infra -t "Environment=production,CostCenter=FIN-104"
 ```
 
-#### Environment Variable Fallback
+#### Environment Variables
+
+If `--tags` or `--tags-file` is not provided, `hoptag` falls back to the `HOPTAG_TAGS` environment variable:
+
 ```bash
 export HOPTAG_TAGS='{"Environment":"production","CostCenter":"FIN-104"}'
 hoptag apply -d ./infra
 ```
 
-#### Non-Destructive CI Mode (Terraform Native Override)
-Generates `_hoptag_override.tf` in the target directory without mutating any source files:
+#### Non-Destructive CI Mode
+
+Generates `_hoptag_override.tf` files containing only the tag definitions. Terraform natively merges override files without modifying your original files:
+
 ```bash
-hoptag apply -d ./infra -t "Environment=staging" --mode=override
+hoptag apply -d ./infra -f tags.yaml --mode=override
 ```
 
-#### Dry Run Mode
-Preview what would be tagged without writing changes to disk:
+#### Dry-Run Mode
+
+Displays what would be tagged without modifying files on disk:
+
 ```bash
-hoptag apply -d ./infra -t "Environment=production" --dry-run
+hoptag apply -d ./infra -f tags.yaml --dry-run
 ```
 
-#### Filter or Skip Resource Types
+#### Filtering Resources
+
 ```bash
 # Only tag AWS resources
-hoptag apply -d ./infra -t "Environment=prod" --filter "^aws_.*"
+hoptag apply -d ./infra -t "Env=prod" --filter "^aws_.*"
 
-# Skip databases
-hoptag apply -d ./infra -t "Environment=prod" --skip ".*_db_instance$"
+# Exclude specific resource types
+hoptag apply -d ./infra -t "Env=prod" --skip ".*_db_instance$"
 ```
 
-#### Flags for `apply`
-| Flag | Shorthand | Description | Default |
-|------|-----------|-------------|---------|
+#### Command Options (`apply`)
+
+| Flag | Short | Description | Default |
+|---|---|---|---|
 | `--dir` | `-d` | Path to directory containing `.tf` files | `.` |
-| `--tags` | `-t` | Inline tags string or file path | `$HOPTAG_TAGS` |
-| `--tags-file` | `-f` | Path to file containing tags (YAML, JSON, .env) | `""` |
-| `--mode` | `-m` | Tagging mode: `in-place`, `override`, `rename` | `in-place` |
-| `--filter` | | Regex pattern to match resource types to tag | `""` |
-| `--skip` | | Regex pattern to exclude resource types | `""` |
-| `--preserve-existing` | | Keep existing tag values instead of overriding | `false` |
+| `--tags` | `-t` | Inline tag string (JSON or key=value) or file path | `$HOPTAG_TAGS` |
+| `--tags-file` | `-f` | Path to tag file (YAML, JSON, or key=value) | `""` |
+| `--mode` | `-m` | Application mode: `in-place`, `override`, or `rename` | `in-place` |
+| `--preserve-existing` | | Preserve existing tag values on conflict | `false` |
+| `--filter` | | Regex pattern matching resource types to tag | `""` |
+| `--skip` | | Regex pattern matching resource types to exclude | `""` |
 | `--recursive` | `-r` | Recursively scan subdirectories for `.tf` files | `true` |
-| `--dry-run` | | Preview tagging changes without writing to disk | `false` |
+| `--dry-run` | | Preview changes without modifying files | `false` |
 
 ---
 
-### 2. `hoptag check` — Governance & Policy Linting
+### 2. `hoptag check`
 
-Fails with **exit code 1** if required tags are missing or fail regex patterns. Ideal for CI pre-commit hooks and pipeline gates before running `terraform plan`.
+Audits resources and exits with code 1 if required tags are missing or fail regex validation. Useful in CI pipelines to gate `terraform plan`.
 
 ```bash
 hoptag check -d ./infra --required "Environment=^(dev|staging|production)$,CostCenter=^CC-[0-9]{4}$,ManagedBy"
 ```
 
-#### Rules Syntax
-- `Key`: Requires the tag key to exist.
-- `Key=^Regex$`: Requires the tag key to exist AND its value to match the regex.
-- Multiple rules separated by commas.
+#### Rule Definitions
 
-Example CI check failure output:
+- `Key`: Tag key must be present on the resource.
+- `Key=^Regex$`: Tag key must be present and match the regex pattern.
+- Comma-separated for multiple rules.
+
+Sample failure output:
+
 ```text
-❌ GOVERNANCE VIOLATIONS DETECTED:
+GOVERNANCE VIOLATIONS DETECTED:
 --------------------------------------------------------------------------------
 [1] infra/compute.tf: aws_instance.web
     Reason: Missing required tag "CostCenter"
@@ -144,44 +162,41 @@ Summary: 2 violation(s) found across 8 resources in 3 files.
 
 ---
 
-## 🧩 Tagging Logic & Provider Mapping
+## Provider Support
 
-`hoptag` automatically detects the provider for each resource block:
+`hoptag` automatically detects provider types by resource prefix:
 
-| Provider | Resource Prefix | Injected Attribute | Example Resource |
-|----------|-----------------|--------------------|------------------|
-| **AWS** | `aws_` | `tags = { ... }` | `aws_instance`, `aws_s3_bucket`, `aws_vpc` |
-| **Azure** | `azurerm_` | `tags = { ... }` | `azurerm_resource_group`, `azurerm_linux_virtual_machine` |
-| **GCP** | `google_` | `labels = { ... }` | `google_compute_instance`, `google_storage_bucket` |
+| Provider | Resource Prefix | Target Attribute | Handled Exceptions |
+|---|---|---|---|
+| AWS | `aws_` | `tags` | Skips non-taggable association blocks (`aws_route`, `aws_security_group_rule`, etc.) |
+| Azure | `azurerm_` | `tags` | Skips untaggable sub-resources (`azurerm_role_assignment`, associations) |
+| GCP | `google_` | `labels` | Skips IAM policy bindings, project services, and non-labelable resources |
 
-### How Existing Attributes Are Merged
+### Merging Semantics
 
-1. **Untagged Resource**:
-   Creates a new map literal formatted with standard Terraform indentation.
-2. **Existing Map Literal**:
+1. **Untagged Resource**: Injects a formatted map block.
+2. **Existing Map**:
    ```hcl
-   # Original
+   # Before
    tags = {
-     # Important custom tag
-     BackupPlan  = "Daily"
+     Name        = "app-server"
      Environment = "dev"
    }
 
    # After: hoptag apply -t "Environment=prod,CostCenter=FIN-104"
    tags = {
-     # Important custom tag
-     BackupPlan  = "Daily"
+     Name        = "app-server"
      Environment = "prod"
      CostCenter  = "FIN-104"
    }
    ```
-   *Comments and unconflicted custom keys are 100% preserved.*
-3. **Dynamic Reference / Variable**:
+   Comments and unconflicted keys are preserved.
+3. **Dynamic Expression**:
    ```hcl
-   # Original
+   # Before
    tags = var.common_tags
 
-   # After: hoptag apply -t "Environment=prod"
+   # After
    tags = merge(var.common_tags, {
      Environment = "prod"
    })
@@ -189,16 +204,17 @@ Summary: 2 violation(s) found across 8 resources in 3 files.
 
 ---
 
-## 🔄 CI/CD Workflows
+## CI/CD Pipeline Integration
 
-### GitHub Actions (Non-Destructive Override Mode)
+### GitHub Actions Example
+
 ```yaml
-name: Infrastructure Pipeline
+name: Terraform Pipeline
 
 on: [pull_request]
 
 jobs:
-  tag-and-plan:
+  validate-and-tag:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -209,15 +225,15 @@ jobs:
       - name: Install hoptag
         run: go install github.com/hoopoelabs/hoptag@latest
 
-      - name: Verify Tag Compliance
+      - name: Enforce Tag Compliance
         run: |
           hoptag check -d ./terraform \
             --required "Environment=^(staging|production)$,CostCenter=^CC-[0-9]{4}$"
 
-      - name: Auto-tag Resources (Non-destructive)
+      - name: Inject CI Tags (Non-destructive)
         run: |
           hoptag apply -d ./terraform \
-            -t "Environment=${{ github.ref_name }},ManagedBy=GitHubActions" \
+            -t "Environment=${{ github.ref_name }},ManagedBy=CI" \
             --mode=override
 
       - name: Terraform Plan
@@ -228,31 +244,31 @@ jobs:
 
 ---
 
-## 🏗️ Architecture
+## Project Structure
 
 ```
 hoptag/
 ├── cmd/
-│   ├── root.go             # Root Cobra command & styling
+│   ├── root.go             # Root command definition
 │   ├── apply.go            # 'hoptag apply' implementation
-│   ├── check.go            # 'hoptag check' policy evaluation
+│   ├── check.go            # 'hoptag check' policy validation
 │   └── version.go          # Version info
 ├── internal/
 │   ├── hcl/
-│   │   ├── parser.go       # File discovery & AST loading via hclwrite
-│   │   ├── injector.go     # Surgical AST tag injection & token merging
+│   │   ├── parser.go       # File discovery and AST loading
+│   │   ├── injector.go     # AST tag injection and token merging
 │   │   └── writer.go       # In-place, override, and rename writers
 │   ├── providers/
-│   │   ├── provider.go     # Provider interface & Registry
-│   │   ├── aws.go          # AWS tagging rules (tags)
-│   │   ├── azure.go        # Azure tagging rules (tags)
-│   │   └── gcp.go          # GCP labeling rules (labels)
+│   │   ├── provider.go     # Provider interface and registry
+│   │   ├── aws.go          # AWS tagging rules
+│   │   ├── azure.go        # Azure tagging rules
+│   │   └── gcp.go          # GCP labeling rules
 │   ├── validator/
-│   │   └── validator.go    # Governance & regex policy engine
+│   │   └── validator.go    # Governance evaluation engine
 │   └── models/
-│       └── tag.go          # Tag data structures & CLI options
+│       └── tag.go          # Tag data structures and parsers
 ├── test/
-│   ├── fixtures/           # Fixture .tf files
+│   ├── fixtures/           # Terraform fixture files
 │   └── integration_test.go # End-to-end integration tests
 ├── Makefile
 ├── go.mod
@@ -261,20 +277,17 @@ hoptag/
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome!
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Run tests: `make test`
-5. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create a feature branch (`git checkout -b feature/improvement`)
+3. Commit your changes (`git commit -m 'feat: description'`)
+4. Verify tests pass: `make test`
+5. Push to the branch (`git push origin feature/improvement`)
 6. Open a Pull Request
 
 ---
 
-## 📄 License
+## License
 
-Licensed under the **Hoopoe Labs Source-Available License** (Free to use for personal, internal, and commercial purposes with mandatory attribution and anti-rebranding protections). See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms.
-
-Developed with ❤️ by **Hoopoe Labs**.
+Licensed under the **Hoopoe Labs Source-Available License** (Free for personal, internal, and commercial use with mandatory attribution and anti-rebranding terms). See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms.

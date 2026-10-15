@@ -83,13 +83,13 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	}
 
 	if !quiet {
-		fmt.Printf("🛡️  %s %s\n", bold("Auditing Directory:"), cyan(checkDir))
-		fmt.Println("📋 " + bold("Required Governance Rules:"))
+		fmt.Printf("%s %s\n", bold("Auditing Directory:"), cyan(checkDir))
+		fmt.Println(bold("Required Governance Rules:"))
 		for _, r := range rules {
 			if r.Pattern != nil {
-				fmt.Printf("   • %s: matches %s\n", bold(r.Key), yellow(r.Pattern.String()))
+				fmt.Printf("   - %s: matches %s\n", bold(r.Key), yellow(r.Pattern.String()))
 			} else {
-				fmt.Printf("   • %s: %s\n", bold(r.Key), yellow("presence required"))
+				fmt.Printf("   - %s: %s\n", bold(r.Key), yellow("presence required"))
 			}
 		}
 		fmt.Println()
@@ -101,7 +101,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	}
 	if len(filePaths) == 0 {
 		if !quiet {
-			fmt.Printf("ℹ️  No Terraform (.tf) files found in %q\n", checkDir)
+			fmt.Printf("No Terraform (.tf) files found in %q\n", checkDir)
 		}
 		return nil
 	}
@@ -135,7 +135,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 
 	if len(allViolations) > 0 {
 		if !quiet {
-			fmt.Println(red(bold("❌ GOVERNANCE VIOLATIONS DETECTED:")))
+			fmt.Println(red(bold("POLICY VIOLATIONS DETECTED:")))
 			fmt.Println("--------------------------------------------------------------------------------")
 			for i, v := range allViolations {
 				relPath, _ := filepath.Rel(checkDir, v.FilePath)
@@ -159,7 +159,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	}
 
 	if !quiet {
-		fmt.Printf("✅ %s All %d resource(s) across %d file(s) comply with tagging policies!\n",
+		fmt.Printf("%s All %d resource(s) across %d file(s) comply with tagging policies!\n",
 			green(bold("PASSED:")), compliantResources, len(filePaths))
 	}
 

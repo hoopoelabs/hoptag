@@ -146,14 +146,14 @@ func runApply(cmd *cobra.Command, args []string) error {
 	}
 
 	if !quiet {
-		fmt.Printf("🎯 %s %s (mode: %s, preserve-existing: %t)\n",
+		fmt.Printf("%s %s (mode: %s, preserve-existing: %t)\n",
 			bold("Target Directory:"), cyan(applyDir), yellow(normalizedMode), applyPreserveExisting)
-		fmt.Println("🏷️  " + bold("Tags to Inject:"))
+		fmt.Println(bold("Tags to Inject:"))
 		for k, v := range tags {
-			fmt.Printf("   • %s: %s\n", bold(k), v)
+			fmt.Printf("   - %s: %s\n", bold(k), v)
 		}
 		if applyDryRun {
-			fmt.Printf("🔍 %s\n", yellow("[DRY RUN ACTIVE] No files will be modified on disk."))
+			fmt.Printf("%s\n", yellow("[DRY RUN] No files will be modified on disk."))
 		}
 		fmt.Println()
 	}
@@ -165,7 +165,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	}
 	if len(filePaths) == 0 {
 		if !quiet {
-			fmt.Printf("ℹ️  No Terraform (.tf) files found in %q\n", applyDir)
+			fmt.Printf("No Terraform (.tf) files found in %q\n", applyDir)
 		}
 		return nil
 	}
@@ -203,10 +203,10 @@ func runApply(cmd *cobra.Command, args []string) error {
 					relPath = path
 				}
 				fmt.Printf("  %s %s (%d resources tagged)\n",
-					green("✓"), bold(relPath), res.ResourcesTagged)
+					green("[OK]"), bold(relPath), res.ResourcesTagged)
 				if verbose {
 					for _, stat := range res.Stats {
-						fmt.Printf("      ↳ [%s] %s.%s (%d injected, %d updated)\n",
+						fmt.Printf("      -> [%s] %s.%s (%d injected, %d updated)\n",
 							stat.AttributeName, stat.ResourceType, stat.ResourceName, stat.InjectedTags, stat.UpdatedTags)
 					}
 				}
@@ -226,7 +226,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	// Summary
 	if !quiet {
 		fmt.Println()
-		fmt.Printf("✨ %s Total files scanned: %d | Files updated: %d | Resources tagged: %d\n",
+		fmt.Printf("%s Total files scanned: %d | Files updated: %d | Resources tagged: %d\n",
 			green(bold("SUCCESS:")), len(filePaths), totalFilesModified, totalResourcesTagged)
 	}
 
@@ -262,14 +262,14 @@ func handleOverrideMode(filePaths []string, opts models.ApplyOptions, registry *
 					relPath = outPath
 				}
 				fmt.Printf("  %s %s (%d resources overridden)\n",
-					green("✓"), bold(relPath), count)
+					green("[OK]"), bold(relPath), count)
 			}
 		}
 	}
 
 	if !quiet {
 		fmt.Println()
-		fmt.Printf("✨ %s Generated %d override file(s) across %d tagged resources.\n",
+		fmt.Printf("%s Generated %d override file(s) across %d tagged resources.\n",
 			green(bold("SUCCESS:")), totalOverrides, totalResourcesTagged)
 		fmt.Println("   Existing .tf files were left completely untouched.")
 	}
