@@ -1,7 +1,7 @@
 # 🏷️ hoptag
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/hoopoelabs/hoptag)](https://goreportcard.com/report/github.com/hoopoelabs/hoptag)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License: Hoopoe Labs Free-Use](https://img.shields.io/badge/License-Hoopoe%20Labs%20Free--Use-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/hoopoelabs/hoptag)](go.mod)
 
 > **Modern, AST-Safe Infrastructure as Code (IaC) Auto-Tagger & Governance CLI**  
@@ -275,4 +275,6 @@ Contributions are welcome!
 
 ## 📄 License
 
-Licensed under the Apache License, Version 2.0. Developed with ❤️ by **Hoopoe Labs**.
+Licensed under the **Hoopoe Labs Source-Available License** (Free to use for personal, internal, and commercial purposes with mandatory attribution and anti-rebranding protections). See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms.
+
+Developed with ❤️ by **Hoopoe Labs**.
