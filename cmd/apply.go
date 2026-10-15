@@ -17,6 +17,7 @@ import (
 var (
 	applyDir              string
 	applyTags             string
+	applyTagsFile         string
 	applyMode             string
 	applyFilter           string
 	applySkip             string
@@ -30,6 +31,10 @@ var applyCmd = &cobra.Command{
 	Short: "Inject and merge tags/labels across Terraform IaC resources",
 	Long: `Applies specified tags/labels to all compatible AWS, Azure, and GCP resources.
 
+Supports reading directly from a file:
+  hoptag apply -d ./infra -f tags.yaml
+  hoptag apply -d ./infra --tags-file tags.json
+
 Supports JSON format:
   hoptag apply -d ./infra -t '{"Environment":"production","CostCenter":"FIN-104","ManagedBy":"HoopoeLabs"}'
 
@@ -37,13 +42,14 @@ Supports key-value shorthand format:
   hoptag apply -d ./infra -t "Environment=production,CostCenter=FIN-104"
 
 Supports non-destructive override mode:
-  hoptag apply -d ./infra -t "Environment=staging" --mode=override`,
+  hoptag apply -d ./infra -f tags.yaml --mode=override`,
 	RunE: runApply,
 }
 
 func init() {
 	applyCmd.Flags().StringVarP(&applyDir, "dir", "d", ".", "Target directory containing Terraform files")
 	applyCmd.Flags().StringVarP(&applyTags, "tags", "t", "", "Tags to apply in JSON or Key=Val format (or HOPTAG_TAGS env)")
+	applyCmd.Flags().StringVarP(&applyTagsFile, "tags-file", "f", "", "Path to file containing tags (JSON, YAML, or .env format)")
 	applyCmd.Flags().StringVarP(&applyMode, "mode", "m", models.ModeInPlace, "Tagging mode: 'in-place', 'override', or 'rename'")
 	applyCmd.Flags().StringVar(&applyFilter, "filter", "", "Regex to filter which resource types to tag (e.g. '^aws_.*')")
 	applyCmd.Flags().StringVar(&applySkip, "skip", "", "Regex to exclude resource types from tagging")
@@ -57,20 +63,49 @@ func init() {
 func runApply(cmd *cobra.Command, args []string) error {
 	printBanner()
 
-	// 1. Resolve tags from flag or environment variable
-	tagInput := strings.TrimSpace(applyTags)
-	if tagInput == "" {
-		tagInput = strings.TrimSpace(os.Getenv("HOPTAG_TAGS"))
-	}
-	if tagInput == "" {
-	}
-	if tagInput == "" {
-		return fmt.Errorf("tags must be specified via --tags/-t or HOPTAG_TAGS environment variable")
+	// Support passing tags or tag file directly as a CLI argument:
+	// Example: hoptag apply my-tags  OR  hoptag apply -d ./infra my-tags
+	if applyTagsFile == "" && applyTags == "" && len(args) > 0 {
+		candidate := strings.TrimSpace(args[0])
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			applyTagsFile = candidate
+		} else {
+			applyTags = candidate
+		}
 	}
 
-	tags, err := models.ParseTags(tagInput)
-	if err != nil {
-		return fmt.Errorf("failed to parse tags: %w", err)
+	// 1. Resolve tags from file, CLI flag, or environment variable
+	tags := make(models.TagMap)
+
+	if applyTagsFile != "" {
+		fileTags, err := models.ParseTagsFromFile(applyTagsFile)
+		if err != nil {
+			return err
+		}
+		for k, v := range fileTags {
+			tags[k] = v
+		}
+	}
+
+	tagInput := strings.TrimSpace(applyTags)
+	if tagInput == "" && len(tags) == 0 {
+		tagInput = strings.TrimSpace(os.Getenv("HOPTAG_TAGS"))
+	}
+	if tagInput == "" && len(tags) == 0 {
+	}
+
+	if tagInput != "" {
+		cliTags, err := models.ParseTags(tagInput)
+		if err != nil {
+			return fmt.Errorf("failed to parse tags: %w", err)
+		}
+		for k, v := range cliTags {
+			tags[k] = v
+		}
+	}
+
+	if len(tags) == 0 {
+		return fmt.Errorf("tags must be specified via --tags/-t, --tags-file/-f, or HOPTAG_TAGS environment variable")
 	}
 
 	// 2. Validate mode

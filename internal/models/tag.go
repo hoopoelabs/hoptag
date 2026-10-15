@@ -1,10 +1,14 @@
 package models
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Standard Apply Modes
@@ -101,19 +105,26 @@ type CheckSummary struct {
 	Violations        []Violation
 }
 
-// ParseTags parses a tag string which can be either a JSON object or comma-separated key=value pairs.
-// Examples:
-// - `{"Environment":"production","CostCenter":"FIN-104"}`
-// - `Environment=production,CostCenter=FIN-104,ManagedBy="hoptag"`
+// ParseTags parses a tag string or loads tags from a file path.
+// It accepts:
+// 1. Any file path on disk (regardless of filename or extension)
+// 2. An inline JSON string: '{"Environment":"production"}'
+// 3. An inline key-value shorthand: 'Environment=production,CostCenter=FIN-104'
 func ParseTags(input string) (TagMap, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return nil, fmt.Errorf("tags input cannot be empty")
 	}
 
+	// 1. Check if input is a file path that exists on disk (with or without '@' prefix)
+	candidatePath := strings.TrimPrefix(input, "@")
+	if info, err := os.Stat(candidatePath); err == nil && !info.IsDir() {
+		return ParseTagsFromFile(candidatePath)
+	}
+
 	res := make(TagMap)
 
-	// Check if input is JSON
+	// 2. Check if input is JSON
 	if strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}") {
 		var rawMap map[string]interface{}
 		if err := json.Unmarshal([]byte(input), &rawMap); err != nil {
@@ -132,8 +143,7 @@ func ParseTags(input string) (TagMap, error) {
 		return res, nil
 	}
 
-	// Shorthand key-value format: Key=Val,Key2=Val2
-	// Handle potential escaped commas or commas inside quotes
+	// 3. Shorthand key-value format: Key=Val,Key2=Val2
 	pairs := splitKeyValuePairs(input)
 	for _, pair := range pairs {
 		pair = strings.TrimSpace(pair)
@@ -147,7 +157,6 @@ func ParseTags(input string) (TagMap, error) {
 		k := strings.TrimSpace(pair[:eqIdx])
 		v := strings.TrimSpace(pair[eqIdx+1:])
 
-		// Strip surrounding single or double quotes
 		k = stripQuotes(k)
 		v = stripQuotes(v)
 
@@ -162,6 +171,79 @@ func ParseTags(input string) (TagMap, error) {
 	}
 
 	return res, nil
+}
+
+// ParseTagsFromFile reads tags from any file path regardless of its name or extension.
+// It automatically detects the content format: JSON, YAML, or line-delimited key=value / key: value.
+func ParseTagsFromFile(filePath string) (TagMap, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tags file %q: %w", filePath, err)
+	}
+
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" {
+		return nil, fmt.Errorf("tags file %q is empty", filePath)
+	}
+
+	res := make(TagMap)
+
+	// Attempt 1: Try JSON
+	var rawJSON map[string]interface{}
+	if err := json.Unmarshal(data, &rawJSON); err == nil && len(rawJSON) > 0 {
+		for k, v := range rawJSON {
+			cleanKey := strings.TrimSpace(k)
+			if cleanKey != "" {
+				res[cleanKey] = fmt.Sprintf("%v", v)
+			}
+		}
+		if len(res) > 0 {
+			return res, nil
+		}
+	}
+
+	// Attempt 2: Try YAML
+	var rawYAML map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawYAML); err == nil && len(rawYAML) > 0 {
+		for k, v := range rawYAML {
+			cleanKey := strings.TrimSpace(k)
+			if cleanKey != "" {
+				res[cleanKey] = fmt.Sprintf("%v", v)
+			}
+		}
+		if len(res) > 0 {
+			return res, nil
+		}
+	}
+
+	// Attempt 3: Line-by-line key=value or key: value
+	scanner := bufio.NewScanner(strings.NewReader(trimmed))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
+			continue
+		}
+		eqIdx := strings.Index(line, "=")
+		colonIdx := strings.Index(line, ":")
+		delimLen := 1
+		splitIdx := eqIdx
+		if splitIdx == -1 || (colonIdx != -1 && colonIdx < splitIdx) {
+			splitIdx = colonIdx
+		}
+		if splitIdx != -1 {
+			k := stripQuotes(strings.TrimSpace(line[:splitIdx]))
+			v := stripQuotes(strings.TrimSpace(line[splitIdx+delimLen:]))
+			if k != "" {
+				res[k] = v
+			}
+		}
+	}
+
+	if len(res) > 0 {
+		return res, nil
+	}
+
+	return nil, fmt.Errorf("could not parse tags from file %q (content must be valid JSON, YAML, or line-delimited key=value)", filePath)
 }
 
 // ParseRules parses required tag definitions and regex validation rules.

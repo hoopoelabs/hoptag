@@ -47,12 +47,26 @@ make build
 
 Automatically injects tags into all compatible resources in the target directory.
 
-#### JSON Input Format
+#### Reading Tags Directly From a File (Any Filename or Extension!)
+Pass the file path directly as an argument or via `-f / --tags-file`. `hoptag` automatically detects YAML, JSON, or key=value formats:
+```bash
+# Direct argument (no flags needed!)
+hoptag apply -d ./infra my-tags-file
+
+# Via -f or --tags-file flag
+hoptag apply -d ./infra -f ./config/tags.yaml
+
+# Via -t flag
+hoptag apply -d ./infra -t ./tags.env
+```
+*Supported file contents: YAML (`key: value`), JSON (`{"key":"value"}`), or line-by-line (`key=value` or `key: value`).*
+
+#### Inline JSON Input Format
 ```bash
 hoptag apply -d ./infra -t '{"Environment":"production","CostCenter":"FIN-104","ManagedBy":"hoptag"}'
 ```
 
-#### Key-Value Shorthand Format
+#### Inline Key-Value Shorthand Format
 ```bash
 hoptag apply -d ./infra -t "Environment=production,CostCenter=FIN-104,Team=DevOps"
 ```
@@ -88,7 +102,8 @@ hoptag apply -d ./infra -t "Environment=prod" --skip ".*_db_instance$"
 | Flag | Shorthand | Description | Default |
 |------|-----------|-------------|---------|
 | `--dir` | `-d` | Path to directory containing `.tf` files | `.` |
-| `--tags` | `-t` | Tags to apply in JSON or Key=Val format | `$HOPTAG_TAGS` |
+| `--tags` | `-t` | Inline tags string or file path | `$HOPTAG_TAGS` |
+| `--tags-file` | `-f` | Path to file containing tags (YAML, JSON, .env) | `""` |
 | `--mode` | `-m` | Tagging mode: `in-place`, `override`, `rename` | `in-place` |
 | `--filter` | | Regex pattern to match resource types to tag | `""` |
 | `--skip` | | Regex pattern to exclude resource types | `""` |

@@ -1,6 +1,8 @@
 package models
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -123,4 +125,57 @@ func TestParseRules(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseTagsFromFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// 1. JSON file
+	jsonPath := filepath.Join(tmpDir, "tags.json")
+	err := os.WriteFile(jsonPath, []byte(`{"Environment":"production","CostCenter":"FIN-104"}`), 0644)
+	require.NoError(t, err)
+
+	tags, err := ParseTagsFromFile(jsonPath)
+	require.NoError(t, err)
+	assert.Equal(t, TagMap{"Environment": "production", "CostCenter": "FIN-104"}, tags)
+
+	// 2. YAML file
+	yamlPath := filepath.Join(tmpDir, "tags.yaml")
+	err = os.WriteFile(yamlPath, []byte("Environment: staging\nCostCenter: CC-8888\nManagedBy: hoptag\n"), 0644)
+	require.NoError(t, err)
+
+	tags, err = ParseTagsFromFile(yamlPath)
+	require.NoError(t, err)
+	assert.Equal(t, TagMap{
+		"Environment": "staging",
+		"CostCenter":  "CC-8888",
+		"ManagedBy":   "hoptag",
+	}, tags)
+
+	// 3. Line-by-line key=value (.env style)
+	envPath := filepath.Join(tmpDir, "tags.env")
+	err = os.WriteFile(envPath, []byte("# Project Tags\nEnvironment=dev\nCostCenter=CC-1111\n"), 0644)
+	require.NoError(t, err)
+
+	tags, err = ParseTagsFromFile(envPath)
+	require.NoError(t, err)
+	assert.Equal(t, TagMap{"Environment": "dev", "CostCenter": "CC-1111"}, tags)
+
+	// 4. Test arbitrary filename with NO extension and direct path in ParseTags
+	arbitraryPath := filepath.Join(tmpDir, "custom_tag_payload")
+	err = os.WriteFile(arbitraryPath, []byte("Owner: devops\nTier: primary\n"), 0644)
+	require.NoError(t, err)
+
+	tags, err = ParseTags(arbitraryPath) // Direct path, no @ required!
+	require.NoError(t, err)
+	assert.Equal(t, TagMap{"Owner": "devops", "Tier": "primary"}, tags)
+
+	// 5. Test @filename shorthand in ParseTags
+	tags, err = ParseTags("@" + yamlPath)
+	require.NoError(t, err)
+	assert.Equal(t, "staging", tags["Environment"])
+
+	// 6. Non-existent file
+	_, err = ParseTagsFromFile(filepath.Join(tmpDir, "non_existent_file"))
+	assert.Error(t, err)
 }
